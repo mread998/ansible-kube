@@ -1,0 +1,10 @@
+
+[masters]
+kube-control ansible_full=kube-control.readnet.local ansible_host=10.11.11.21 ansible_user=mread
+
+[workers]
+kube-node-one ansible_full=kube-node-one.readnet.local ansible_host=10.11.11.22 ansible_user=mread
+kube-node-two ansible_full=kube-node-two.readnet.local ansible_host=10.11.11.23 ansible_user=mread
+
+[testing]
+ansible-testing ansible_full=ansible-testing.readnet.local ansible_host=10.11.11.29 ansible_user=mread

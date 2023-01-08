@@ -1,0 +1,180 @@
+---
+- hosts: masters, workers
+  become: true
+  tasks:
+    
+  - name: Make sure an entry in /etc/hosts exists
+    lineinfile:
+      path: /etc/hosts
+      line: "10.11.11.21 kube-contorl kube-control.readnet.local"
+      state: present
+    tags: network,hostname,dns
+ 
+  - name: Make sure an entry in /etc/hosts exists
+    lineinfile:
+      path: /etc/hosts
+      line: "10.11.11.22 kube-node-one kube-node-one.readnet.local" 
+      state: present
+    tags: network,hostname,dns
+
+  - name: Make sure an entry in /etc/hosts exists
+    lineinfile:
+      path: /etc/hosts
+      line: "10.11.11.23 kube-node-two kube-node-two.readnet.local"
+      state: present
+    tags: network,hostname,dns 
+  
+  - name: Remove swapfile from /etc/fstab and disable swap
+    mount:
+      name: "{{ item }}"
+      fstype: swap
+      state: absent
+    with_items:
+      - swap
+      - none
+
+  - name: Disable swap
+    command: swapoff -a
+    when: ansible_swaptotal_mb > 0
+  
+  - name: Creating /etc/modules-load.d/containerd.conf file
+    file:
+      path: "/etc/modules-load.d/containerd.conf"
+      state: touch
+      
+  - name: add overlay kernel modules
+    lineinfile:
+      path: /etc/modules-load.d/containerd.conf
+      line: overlay
+      state: present
+ 
+  - name: add br_netfilter kernel modules
+    lineinfile:
+      path: /etc/modules-load.d/containerd.conf
+      line: br_netfilter
+      state: present
+      
+  - name: Creating /etc/sysctl.d/kubernetes.conf file
+    file:
+      path: "/etc/sysctl.d/kubernetes.conf"
+      state: touch
+      
+  - name: add Kernel parameters call ip6tables
+    lineinfile:
+      path: /etc/sysctl.d/kubernetes.conf
+      line: net.bridge.bridge-nf-call-ip6tables = 1
+      state: present
+
+  - name: add Kernel parameters call iptables
+    lineinfile:
+      path: /etc/sysctl.d/kubernetes.conf
+      line: net.bridge.bridge-nf-call-iptables = 1
+      state: present
+
+  - name: add Kernel parameters ip_forward
+    lineinfile:
+      path: /etc/sysctl.d/kubernetes.conf
+      line: net.ipv4.ip_forward = 1
+      state: present
+
+  - name: reload system changes
+    shell: |
+      sudo sysctl --system
+      
+  - name: Install packages that allow apt to be used over HTTPS
+    apt:
+      name: "{{ packages }}"
+      state: present
+      update_cache: yes
+    vars:
+      packages:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg-agent
+      - software-properties-common
+      - qemu-guest-agent
+      
+  - name: Add an apt signing key for Docker
+    apt_key:
+      url: https://download.docker.com/linux/ubuntu/gpg
+      state: present
+      
+  - name: Add apt repository for stable version
+    apt_repository:
+      repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu xenial stable
+      state: present
+
+  - name: Install containerd
+    apt:
+      name: containerd
+      state: present
+      update_cache: yes
+  
+  - name: Ansible check containerd directory.
+    stat:
+     path: /etc/containerd
+    register: containerd
+  
+  - name: "Ansible Create directory if not exists"
+    file:
+     path: /etc/containerd
+     state: directory
+     mode: 0775
+     group: root
+     owner: root
+    when: containerd.stat.exists == false
+    
+  - name: create containerd config file, set cgroups to true and enable on boot.
+    shell: |
+      sudo containerd config default | sudo tee /etc/containerd/config.toml
+      sudo sed -i 's/SystemdCgroup \= false/SystemdCgroup \= true/g' /etc/containerd/config.toml
+      sudo systemctl enable containerd
+      sudo systemctl restart containerd
+
+# up to step 4
+  - name: Add an apt signing key for Kubernetes
+    apt_key:
+      url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+      state: present
+      
+  - name: Adding apt repository for Kubernetes
+    apt_repository:
+      repo: deb https://apt.kubernetes.io/ kubernetes-xenial main
+      state: present
+      filename: kubern
+
+# #step 5 
+  - name: Install Kubernetes binaries
+    apt: 
+      name: "{{ packages }}"
+      state: present
+      update_cache: yes
+    vars:
+      packages:
+        - kubelet 
+        - kubeadm 
+        - kubectl
+
+  - name: mark apt hold on kubelet kubeadm kubectl
+    shell: |
+      sudo apt-mark hold kubelet kubeadm kubectl
+
+  - name: reboot post install
+    reboot:
+
+
+
+
+
+  
+
+  
+
+
+  
+  
+
+  
+
+

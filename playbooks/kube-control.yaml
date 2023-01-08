@@ -1,0 +1,16 @@
+---
+- hosts: testing
+  become: true
+  tasks:
+
+  - name: Initialize the Kubernetes cluster using kubeadm
+    command: sudo kubeadm init --control-plane-endpoint=kube-control.readnet.local
+    
+  - name: Setup kubeconfig for user
+    command: "{{ item }}"
+    with_items:
+     - mkdir -p /home/mread/.kube
+     - cp -i /etc/kubernetes/admin.conf /home/mread/.kube/config
+     - chown mread:mread /home/mread/.kube/config 
+  
+  
